@@ -41,5 +41,24 @@ class TestAgingPriorityQueue(unittest.TestCase):
         with self.assertRaises(IndexError):
             pq.peek()
 
+    def test_contains(self):
+        pq = AgingPriorityQueue()
+        pq.push(1, "Task A")
+        pq.push(2, "Task B")
+        self.assertIn("Task A", pq)
+        self.assertIn("Task B", pq)
+        self.assertNotIn("Task C", pq)
+
+    def test_iteration(self):
+        pq = AgingPriorityQueue()
+        items = ["A", "B", "C"]
+        for item in items:
+            pq.push(1, item)
+        
+        iterated_items = list(pq)
+        self.assertEqual(len(iterated_items), 3)
+        for item in items:
+            self.assertIn(item, iterated_items)
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,7 @@
 import heapq
 import time
 from threading import Lock
-from typing import Any, Tuple
+from typing import Any, Tuple, Iterator
 
 class AgingPriorityQueue:
     """
@@ -95,3 +95,20 @@ class AgingPriorityQueue:
     def __len__(self):
         with self._lock:
             return len(self._queue)
+
+    def __contains__(self, item: Any) -> bool:
+        """
+        Checks if an item is currently in the queue.
+        """
+        with self._lock:
+            return any(entry[2] == item for entry in self._queue)
+
+    def __iter__(self) -> Iterator[Any]:
+        """
+        Returns an iterator over the items currently in the queue.
+        Note: The order of iteration is based on the underlying heap structure,
+        not the current aged priority order.
+        """
+        with self._lock:
+            # Return a snapshot of items to ensure thread-safety during iteration
+            return iter([entry[2] for entry in self._queue])
