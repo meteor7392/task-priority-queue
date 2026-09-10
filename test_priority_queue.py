@@ -22,10 +22,24 @@ class TestAgingPriorityQueue(unittest.TestCase):
         
         self.assertEqual(pq.pop(), "Very Low")
 
+    def test_peek(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "Low")
+        pq.push(1, "High")
+        self.assertEqual(pq.peek(), "High")
+        # Ensure peek didn't remove the item
+        self.assertEqual(len(pq), 2)
+        self.assertEqual(pq.pop(), "High")
+
     def test_empty_pop(self):
         pq = AgingPriorityQueue()
         with self.assertRaises(IndexError):
             pq.pop()
+
+    def test_empty_peek(self):
+        pq = AgingPriorityQueue()
+        with self.assertRaises(IndexError):
+            pq.peek()
 
 if __name__ == "__main__":
     unittest.main()
