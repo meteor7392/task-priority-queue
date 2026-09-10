@@ -6,6 +6,7 @@ A Python implementation of a priority queue that prevents low-priority task star
 - Priority-based dequeuing
 - Aging mechanism to prevent starvation
 - Thread-safe operations
+- Support for peeking and clearing the queue
 
 ## Installation
 ```bash
@@ -25,4 +26,7 @@ queue.push(1, "High priority task")
 
 # After some time/operations, low priority tasks gain priority
 print(queue.pop())
+
+# Clear all tasks
+queue.clear()
 ```

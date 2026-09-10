@@ -85,6 +85,13 @@ class AgingPriorityQueue:
             
             return item
 
+    def clear(self):
+        """
+        Removes all items from the queue.
+        """
+        with self._lock:
+            self._queue.clear()
+
     def __len__(self):
         with self._lock:
             return len(self._queue)
