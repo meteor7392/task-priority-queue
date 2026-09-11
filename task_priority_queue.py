@@ -85,6 +85,27 @@ class AgingPriorityQueue:
             
             return item
 
+    def remove(self, item: Any):
+        """
+        Removes a specific item from the queue if it exists.
+        Raises ValueError if the item is not found.
+        """
+        with self._lock:
+            idx = -1
+            for i, entry in enumerate(self._queue):
+                if entry[2] == item:
+                    idx = i
+                    break
+            
+            if idx == -1:
+                raise ValueError("item not in priority queue")
+
+            self._queue[idx] = self._queue[-1]
+            self._queue.pop()
+            if idx < len(self._queue):
+                heapq._siftdown(self._queue, 0, idx)
+                heapq._siftup(self._queue, idx)
+
     def clear(self):
         """
         Removes all items from the queue.

@@ -60,5 +60,18 @@ class TestAgingPriorityQueue(unittest.TestCase):
         for item in items:
             self.assertIn(item, iterated_items)
 
+    def test_remove(self):
+        pq = AgingPriorityQueue()
+        pq.push(1, "Task A")
+        pq.push(2, "Task B")
+        pq.push(3, "Task C")
+        
+        pq.remove("Task B")
+        self.assertNotIn("Task B", pq)
+        self.assertEqual(len(pq), 2)
+        
+        with self.assertRaises(ValueError):
+            pq.remove("Task D")
+
 if __name__ == "__main__":
     unittest.main()
