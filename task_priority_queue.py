@@ -106,6 +106,19 @@ class AgingPriorityQueue:
                 heapq._siftdown(self._queue, 0, idx)
                 heapq._siftup(self._queue, idx)
 
+    def get_current_priority(self, item: Any) -> float:
+        """
+        Returns the current calculated priority of an item, accounting for aging.
+        Raises ValueError if the item is not found.
+        """
+        with self._lock:
+            now = time.time()
+            for orig_priority, entry_time, queue_item in self._queue:
+                if queue_item == item:
+                    age = now - entry_time
+                    return orig_priority - (age * self.aging_rate)
+            raise ValueError("item not in priority queue")
+
     def clear(self):
         """
         Removes all items from the queue.
