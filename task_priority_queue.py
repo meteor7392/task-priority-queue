@@ -106,6 +106,29 @@ class AgingPriorityQueue:
                 heapq._siftdown(self._queue, 0, idx)
                 heapq._siftup(self._queue, idx)
 
+    def update_priority(self, item: Any, new_priority: float):
+        """
+        Updates the base priority of an existing item while preserving its entry time.
+        Raises ValueError if the item is not found.
+        """
+        with self._lock:
+            idx = -1
+            for i, entry in enumerate(self._queue):
+                if entry[2] == item:
+                    idx = i
+                    break
+            
+            if idx == -1:
+                raise ValueError("item not in priority queue")
+
+            # Preserve the original entry time to maintain the aging progress
+            entry_time = self._queue[idx][1]
+            self._queue[idx] = (new_priority, entry_time, item)
+            
+            # Since we changed the priority, we must restore the heap property
+            heapq._siftdown(self._queue, 0, idx)
+            heapq._siftup(self._queue, idx)
+
     def get_current_priority(self, item: Any) -> float:
         """
         Returns the current calculated priority of an item, accounting for aging.
