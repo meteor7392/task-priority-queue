@@ -89,5 +89,20 @@ class TestAgingPriorityQueue(unittest.TestCase):
         with self.assertRaises(ValueError):
             pq.update_priority("Task C", 1)
 
+    def test_priority_boost(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "Low")
+        pq.push(5, "Medium")
+        
+        # Initially Medium is highest
+        self.assertEqual(pq.peek(), "Medium")
+        
+        with pq.priority_boost("Low", 10):
+            # Low priority (10) boosted by 10 = 0, now highest
+            self.assertEqual(pq.peek(), "Low")
+            
+        # After context, should return to Medium
+        self.assertEqual(pq.peek(), "Medium")
+
 if __name__ == "__main__":
     unittest.main()

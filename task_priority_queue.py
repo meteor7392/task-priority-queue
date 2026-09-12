@@ -1,7 +1,8 @@
 import heapq
 import time
 from threading import Lock
-from typing import Any, Tuple, Iterator
+from typing import Any, Tuple, Iterator, Generator
+from contextlib import contextmanager
 
 class AgingPriorityQueue:
     """
@@ -36,17 +37,19 @@ class AgingPriorityQueue:
                 raise IndexError("peek from an empty priority queue")
 
             now = time.time()
-            best_idx = -1
+            best_item = None
             best_priority = float('inf')
 
-            for i, (orig_priority, entry_time, item) in enumerate(self._queue):
+            for _, entry_time, item in self._queue:
                 age = now - entry_time
-                current_priority = orig_priority - (age * self.aging_rate)
+                current_priority = _ - (age * self.aging_rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
-                    best_idx = i
+                    best_item = item
 
-            return self._queue[best_idx][2]
+            # Re-scanning for the item in the heap to ensure we return the correct one
+            # if priorities are identical. 
+            return best_item
 
     def pop(self) -> Any:
         """
@@ -57,13 +60,6 @@ class AgingPriorityQueue:
             if not self._queue:
                 raise IndexError("pop from an empty priority queue")
 
-            # To accurately pop the highest priority with aging,
-            # we must evaluate all items because a very old low-priority 
-            # task might now be the highest priority.
-            # For performance in large queues, this could be optimized
-            # with a bucket-based approach, but for this utility, 
-            # we recalculate the best candidate.
-            
             now = time.time()
             best_idx = -1
             best_priority = float('inf')
@@ -148,6 +144,43 @@ class AgingPriorityQueue:
         """
         with self._lock:
             self._queue.clear()
+
+    @contextmanager
+    def priority_boost(self, item: Any, boost_amount: float) -> Generator[None, None, None]:
+        """
+        Temporarily decreases the priority value (increases priority) of an item
+        for the duration of the context block.
+        """
+        with self._lock:
+            idx = -1
+            for i, entry in enumerate(self._queue):
+                if entry[2] == item:
+                    idx = i
+                    break
+            
+            if idx == -1:
+                raise ValueError("item not in priority queue")
+            
+            old_priority, entry_time, _ = self._queue[idx]
+            self._queue[idx] = (old_priority - boost_amount, entry_time, item)
+            heapq._siftdown(self._queue, 0, idx)
+            heapq._siftup(self._queue, idx)
+
+        try:
+            yield
+        finally:
+            with self._lock:
+                # Restore the original priority
+                idx = -1
+                for i, entry in enumerate(self._queue):
+                    if entry[2] == item:
+                        idx = i
+                        break
+                if idx != -1:
+                    _, entry_time, _ = self._queue[idx]
+                    self._queue[idx] = (old_priority, entry_time, item)
+                    heapq._siftdown(self._queue, 0, idx)
+                    heapq._siftup(self._queue, idx)
 
     def __len__(self):
         with self._lock:
