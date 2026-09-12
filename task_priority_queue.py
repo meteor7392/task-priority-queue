@@ -182,6 +182,13 @@ class AgingPriorityQueue:
                     heapq._siftdown(self._queue, 0, idx)
                     heapq._siftup(self._queue, idx)
 
+    def is_empty(self) -> bool:
+        """
+        Returns True if the queue is empty, False otherwise.
+        """
+        with self._lock:
+            return len(self._queue) == 0
+
     def __len__(self):
         with self._lock:
             return len(self._queue)

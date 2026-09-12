@@ -8,6 +8,7 @@ A Python implementation of a priority queue that prevents low-priority task star
 - Thread-safe operations
 - Support for peeking, clearing, and querying current priority
 - Dynamic priority updates
+- Simple emptiness checks
 
 ## Installation
 ```bash
