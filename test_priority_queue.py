@@ -73,5 +73,21 @@ class TestAgingPriorityQueue(unittest.TestCase):
         with self.assertRaises(ValueError):
             pq.remove("Task D")
 
+    def test_update_priority(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "Task A")
+        pq.push(5, "Task B")
+        
+        # Initially Task B is highest priority
+        self.assertEqual(pq.peek(), "Task B")
+        
+        # Update Task A to be higher priority than Task B
+        pq.update_priority("Task A", 2)
+        self.assertEqual(pq.peek(), "Task A")
+        
+        # Ensure update_priority raises ValueError for missing items
+        with self.assertRaises(ValueError):
+            pq.update_priority("Task C", 1)
+
 if __name__ == "__main__":
     unittest.main()
