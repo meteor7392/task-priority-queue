@@ -104,5 +104,21 @@ class TestAgingPriorityQueue(unittest.TestCase):
         # After context, should return to Medium
         self.assertEqual(pq.peek(), "Medium")
 
+    def test_get_sorted_tasks(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "Low")
+        pq.push(1, "High")
+        pq.push(5, "Medium")
+        
+        self.assertEqual(pq.get_sorted_tasks(), ["High", "Medium", "Low"])
+        
+        # Test with aging
+        pq_aging = AgingPriorityQueue(aging_rate=10)
+        pq_aging.push(20, "Low")
+        pq_aging.push(5, "High")
+        # Wait until Low (20) aged by 20 becomes 0, making it higher priority than High (5)
+        time.sleep(2.1)
+        self.assertEqual(pq_aging.get_sorted_tasks()[0], "Low")
+
 if __name__ == "__main__":
     unittest.main()

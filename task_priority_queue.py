@@ -1,7 +1,7 @@
 import heapq
 import time
 from threading import Lock
-from typing import Any, Tuple, Iterator, Generator
+from typing import Any, Tuple, Iterator, Generator, List
 from contextlib import contextmanager
 
 class AgingPriorityQueue:
@@ -137,6 +137,23 @@ class AgingPriorityQueue:
                     age = now - entry_time
                     return orig_priority - (age * self.aging_rate)
             raise ValueError("item not in priority queue")
+
+    def get_sorted_tasks(self) -> List[Any]:
+        """
+        Returns a list of all items in the queue, sorted by their current
+        effective priority (lowest value first).
+        """
+        with self._lock:
+            now = time.time()
+            tasks_with_priority = []
+            for orig_priority, entry_time, item in self._queue:
+                age = now - entry_time
+                effective_priority = orig_priority - (age * self.aging_rate)
+                tasks_with_priority.append((effective_priority, item))
+            
+            # Sort by effective priority
+            tasks_with_priority.sort(key=lambda x: x[0])
+            return [item for _, item in tasks_with_priority]
 
     def clear(self):
         """
