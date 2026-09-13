@@ -223,3 +223,17 @@ class AgingPriorityQueue:
         """
         with self._lock:
             return iter([entry[2] for entry in self._queue])
+
+    def __repr__(self) -> str:
+        """
+        Returns a developer-friendly string representation of the queue.
+        """
+        with self._lock:
+            return f"AgingPriorityQueue(aging_rate={self.aging_rate}, size={len(self._queue)})"
+
+    def __str__(self) -> str:
+        """
+        Returns a human-readable string of the current sorted tasks.
+        """
+        tasks = self.get_sorted_tasks()
+        return f"AgingPriorityQueue(tasks={tasks})"
