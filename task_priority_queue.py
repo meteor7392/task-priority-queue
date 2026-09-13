@@ -17,6 +17,13 @@ class AgingPriorityQueue:
         self._lock = Lock()
         self.aging_rate = aging_rate
 
+    def set_aging_rate(self, new_rate: float):
+        """
+        Dynamically updates the aging rate for all items in the queue.
+        """
+        with self._lock:
+            self.aging_rate = new_rate
+
     def push(self, priority: float, item: Any):
         """
         Adds an item to the queue.

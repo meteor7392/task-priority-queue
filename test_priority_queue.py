@@ -129,5 +129,40 @@ class TestAgingPriorityQueue(unittest.TestCase):
         # At this moment: A is 20 - 20 = 0. B is 10. A should be popped.
         self.assertEqual(pq_gap.pop(), "A")
 
+    def test_set_aging_rate(self):
+        """Verify that changing the aging rate mid-flight affects priorities."""
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "Low")
+        pq.push(5, "High")
+        
+        # Currently High (5) is top
+        self.assertEqual(pq.peek(), "High")
+        
+        # Change aging rate to be very high
+        pq.set_aging_rate(100)
+        time.sleep(0.1) # Age low priority task significantly
+        
+        # Now Low should have aged enough to beat High
+        # Low: 10 - (0.1 * 100) = 0
+        # High: 5 - (0.1 * 100) = -5 
+        # Wait, if both age, the relative order stays same unless we push after rate change
+        # Let's try a different scenario: push Low, wait, push High, then change rate.
+        
+        pq.clear()
+        pq.set_aging_rate(0)
+        pq.push(20, "OldLow")
+        time.sleep(0.5)
+        pq.push(10, "NewHigh")
+        
+        # NewHigh is better (10 < 20)
+        self.assertEqual(pq.peek(), "NewHigh")
+        
+        # Boost aging rate so OldLow catches up
+        pq.set_aging_rate(100)
+        # OldLow has been there for ~0.5s. Now it ages by 100/s
+        # Effective priority: 20 - (0.5 * 100) = -30
+        # NewHigh effective: 10 - (0 * 100) approx = 10
+        self.assertEqual(pq.peek(), "OldLow")
+
 if __name__ == "__main__":
     unittest.main()
