@@ -1,7 +1,7 @@
 import heapq
 import time
 from threading import Lock
-from typing import Any, Tuple, Iterator, Generator, List
+from typing import Any, Tuple, Iterator, Generator, List, Dict
 from contextlib import contextmanager
 
 class AgingPriorityQueue:
@@ -149,6 +149,20 @@ class AgingPriorityQueue:
             for base_p, entry_time, queue_item in self._queue:
                 if queue_item == item:
                     return base_p - ((now - entry_time) * rate)
+            raise ValueError("item not in priority queue")
+
+    def get_priority_details(self, item: Any) -> Dict[str, Any]:
+        """
+        Returns the base priority and entry time of an item.
+        Raises ValueError if the item is not found.
+        """
+        with self._lock:
+            for base_p, entry_time, queue_item in self._queue:
+                if queue_item == item:
+                    return {
+                        "base_priority": base_p,
+                        "entry_time": entry_time
+                    }
             raise ValueError("item not in priority queue")
 
     def get_sorted_tasks(self) -> List[Any]:
