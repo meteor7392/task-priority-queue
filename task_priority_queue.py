@@ -40,15 +40,16 @@ class AgingPriorityQueue:
             best_item = None
             best_priority = float('inf')
 
-            for _, entry_time, item in self._queue:
-                age = now - entry_time
-                current_priority = _ - (age * self.aging_rate)
+            # Since aging is uniform across all elements, the item that is currently
+            # the highest priority is either the one with the lowest base priority
+            # or the one that has been waiting the longest.
+            # To be accurate with aging, we must find the minimum of (base_p - rate * age).
+            for base_p, entry_time, item in self._queue:
+                current_priority = base_p - ((now - entry_time) * self.aging_rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
                     best_item = item
 
-            # Re-scanning for the item in the heap to ensure we return the correct one
-            # if priorities are identical. 
             return best_item
 
     def pop(self) -> Any:
@@ -64,18 +65,23 @@ class AgingPriorityQueue:
             best_idx = -1
             best_priority = float('inf')
 
-            for i, (orig_priority, entry_time, item) in enumerate(self._queue):
-                age = now - entry_time
-                current_priority = orig_priority - (age * self.aging_rate)
+            for i, (base_p, entry_time, item) in enumerate(self._queue):
+                current_priority = base_p - ((now - entry_time) * self.aging_rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
                     best_idx = i
 
-            # Remove the best element and maintain heap property
+            # Remove the best element
             item = self._queue[best_idx][2]
-            self._queue[best_idx] = self._queue[-1]
-            self._queue.pop()
+            
+            # To maintain heap property after removing an arbitrary index:
+            # 1. Swap with the last element
+            # 2. Pop the last element
+            # 3. Restore heap property for the swapped element
+            last_element = self._queue.pop()
             if best_idx < len(self._queue):
+                self._queue[best_idx] = last_element
+                # Sift down and up to reposition the element
                 heapq._siftdown(self._queue, 0, best_idx)
                 heapq._siftup(self._queue, best_idx)
             
@@ -96,9 +102,9 @@ class AgingPriorityQueue:
             if idx == -1:
                 raise ValueError("item not in priority queue")
 
-            self._queue[idx] = self._queue[-1]
-            self._queue.pop()
+            last_element = self._queue.pop()
             if idx < len(self._queue):
+                self._queue[idx] = last_element
                 heapq._siftdown(self._queue, 0, idx)
                 heapq._siftup(self._queue, idx)
 
@@ -117,11 +123,9 @@ class AgingPriorityQueue:
             if idx == -1:
                 raise ValueError("item not in priority queue")
 
-            # Preserve the original entry time to maintain the aging progress
             entry_time = self._queue[idx][1]
             self._queue[idx] = (new_priority, entry_time, item)
             
-            # Since we changed the priority, we must restore the heap property
             heapq._siftdown(self._queue, 0, idx)
             heapq._siftup(self._queue, idx)
 
@@ -132,10 +136,9 @@ class AgingPriorityQueue:
         """
         with self._lock:
             now = time.time()
-            for orig_priority, entry_time, queue_item in self._queue:
+            for base_p, entry_time, queue_item in self._queue:
                 if queue_item == item:
-                    age = now - entry_time
-                    return orig_priority - (age * self.aging_rate)
+                    return base_p - ((now - entry_time) * self.aging_rate)
             raise ValueError("item not in priority queue")
 
     def get_sorted_tasks(self) -> List[Any]:
@@ -146,12 +149,10 @@ class AgingPriorityQueue:
         with self._lock:
             now = time.time()
             tasks_with_priority = []
-            for orig_priority, entry_time, item in self._queue:
-                age = now - entry_time
-                effective_priority = orig_priority - (age * self.aging_rate)
+            for base_p, entry_time, item in self._queue:
+                effective_priority = base_p - ((now - entry_time) * self.aging_rate)
                 tasks_with_priority.append((effective_priority, item))
             
-            # Sort by effective priority
             tasks_with_priority.sort(key=lambda x: x[0])
             return [item for _, item in tasks_with_priority]
 
@@ -187,7 +188,6 @@ class AgingPriorityQueue:
             yield
         finally:
             with self._lock:
-                # Restore the original priority
                 idx = -1
                 for i, entry in enumerate(self._queue):
                     if entry[2] == item:
@@ -220,9 +220,6 @@ class AgingPriorityQueue:
     def __iter__(self) -> Iterator[Any]:
         """
         Returns an iterator over the items currently in the queue.
-        Note: The order of iteration is based on the underlying heap structure,
-        not the current aged priority order.
         """
         with self._lock:
-            # Return a snapshot of items to ensure thread-safety during iteration
             return iter([entry[2] for entry in self._queue])

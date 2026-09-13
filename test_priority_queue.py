@@ -120,5 +120,14 @@ class TestAgingPriorityQueue(unittest.TestCase):
         time.sleep(2.1)
         self.assertEqual(pq_aging.get_sorted_tasks()[0], "Low")
 
+    def test_aging_reorder_pop(self):
+        """Verify that pop() correctly identifies the aged highest priority item."""
+        pq_gap = AgingPriorityQueue(aging_rate=10)
+        pq_gap.push(20, "A") # Base 20
+        time.sleep(2.0)       # A ages by 20
+        pq_gap.push(10, "B") # Base 10
+        # At this moment: A is 20 - 20 = 0. B is 10. A should be popped.
+        self.assertEqual(pq_gap.pop(), "A")
+
 if __name__ == "__main__":
     unittest.main()
