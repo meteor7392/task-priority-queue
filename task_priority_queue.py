@@ -44,6 +44,7 @@ class AgingPriorityQueue:
                 raise IndexError("peek from an empty priority queue")
 
             now = time.time()
+            rate = self.aging_rate
             best_item = None
             best_priority = float('inf')
 
@@ -52,7 +53,7 @@ class AgingPriorityQueue:
             # or the one that has been waiting the longest.
             # To be accurate with aging, we must find the minimum of (base_p - rate * age).
             for base_p, entry_time, item in self._queue:
-                current_priority = base_p - ((now - entry_time) * self.aging_rate)
+                current_priority = base_p - ((now - entry_time) * rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
                     best_item = item
@@ -69,11 +70,12 @@ class AgingPriorityQueue:
                 raise IndexError("pop from an empty priority queue")
 
             now = time.time()
+            rate = self.aging_rate
             best_idx = -1
             best_priority = float('inf')
 
             for i, (base_p, entry_time, item) in enumerate(self._queue):
-                current_priority = base_p - ((now - entry_time) * self.aging_rate)
+                current_priority = base_p - ((now - entry_time) * rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
                     best_idx = i
@@ -143,9 +145,10 @@ class AgingPriorityQueue:
         """
         with self._lock:
             now = time.time()
+            rate = self.aging_rate
             for base_p, entry_time, queue_item in self._queue:
                 if queue_item == item:
-                    return base_p - ((now - entry_time) * self.aging_rate)
+                    return base_p - ((now - entry_time) * rate)
             raise ValueError("item not in priority queue")
 
     def get_sorted_tasks(self) -> List[Any]:
@@ -155,9 +158,10 @@ class AgingPriorityQueue:
         """
         with self._lock:
             now = time.time()
+            rate = self.aging_rate
             tasks_with_priority = []
             for base_p, entry_time, item in self._queue:
-                effective_priority = base_p - ((now - entry_time) * self.aging_rate)
+                effective_priority = base_p - ((now - entry_time) * rate)
                 tasks_with_priority.append((effective_priority, item))
             
             tasks_with_priority.sort(key=lambda x: x[0])
