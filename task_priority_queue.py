@@ -52,6 +52,9 @@ class AgingPriorityQueue:
         Adds an item to the queue.
         Priority is stored as (current_priority, entry_time, item).
         """
+        if not isinstance(priority, (int, float)):
+            raise TypeError("Priority must be a number")
+            
         with self._lock:
             # We store entry time to calculate age during pop
             entry_time = time.time()
@@ -66,6 +69,8 @@ class AgingPriorityQueue:
         with self._lock:
             now = time.time()
             for priority, item in items:
+                if not isinstance(priority, (int, float)):
+                    raise TypeError(f"Priority for item {item} must be a number")
                 heapq.heappush(self._queue, (priority, now, item))
                 self._items_set.add(item)
 
@@ -91,6 +96,25 @@ class AgingPriorityQueue:
                     best_item = item
 
             return best_item
+
+    def get_top_priority(self) -> float:
+        """
+        Returns the effective priority value of the item that would be popped next.
+        """
+        with self._lock:
+            if not self._queue:
+                raise IndexError("get_top_priority from an empty priority queue")
+
+            now = time.time()
+            best_priority = float('inf')
+
+            for base_p, entry_time, item in self._queue:
+                rate = self._item_rates.get(item, self.aging_rate)
+                current_priority = base_p - ((now - entry_time) * rate)
+                if current_priority < best_priority:
+                    best_priority = current_priority
+
+            return best_priority
 
     def pop(self) -> Any:
         """
@@ -171,6 +195,9 @@ class AgingPriorityQueue:
         Updates the base priority of an existing item while preserving its entry time.
         Raises ValueError if the item is not found.
         """
+        if not isinstance(new_priority, (int, float)):
+            raise TypeError("Priority must be a number")
+
         with self._lock:
             idx = -1
             for i, entry in enumerate(self._queue):
@@ -245,6 +272,9 @@ class AgingPriorityQueue:
         Temporarily decreases the priority value (increases priority) of an item
         for the duration of the context block.
         """
+        if not isinstance(boost_amount, (int, float)):
+            raise TypeError("Boost amount must be a number")
+
         with self._lock:
             idx = -1
             for i, entry in enumerate(self._queue):
