@@ -1,7 +1,7 @@
 import heapq
 import time
 from threading import Lock
-from typing import Any, Tuple, Iterator, Generator, List, Dict, Set
+from typing import Any, Tuple, Iterator, Generator, List, Dict, Set, Optional
 from contextlib import contextmanager
 
 class AgingPriorityQueue:
@@ -9,13 +9,16 @@ class AgingPriorityQueue:
     A Priority Queue where the priority of an item increases (numerically decreases)
     the longer it stays in the queue to prevent starvation.
     """
-    def __init__(self, aging_rate: float = 0.1):
+    def __init__(self, aging_rate: float = 0.1, min_priority: Optional[float] = None):
         """
         :param aging_rate: How much to decrease the priority value per second of waiting.
+        :param min_priority: Optional lower bound for the effective priority. 
+                             If set, priorities will not drop below this value.
         """
         self._queue = []
         self._lock = Lock()
         self.aging_rate = aging_rate
+        self.min_priority = min_priority
         self._item_rates = {}
         self._items_set: Set[Any] = set()
 
@@ -25,6 +28,13 @@ class AgingPriorityQueue:
         """
         with self._lock:
             self.aging_rate = new_rate
+
+    def set_min_priority(self, new_min: Optional[float]):
+        """
+        Updates the minimum allowed effective priority.
+        """
+        with self._lock:
+            self.min_priority = new_min
 
     def set_item_aging_rate(self, item: Any, new_rate: float):
         """
@@ -56,6 +66,14 @@ class AgingPriorityQueue:
     def _queue_items(self) -> List[Any]:
         """Internal helper to get all items in the queue."""
         return [entry[2] for entry in self._queue]
+
+    def _calculate_effective_priority(self, base_p: float, entry_time: float, item: Any, now: float) -> float:
+        """Internal helper to calculate clamped effective priority."""
+        rate = self._item_rates.get(item, self.aging_rate)
+        effective = base_p - ((now - entry_time) * rate)
+        if self.min_priority is not None:
+            return max(effective, self.min_priority)
+        return effective
 
     def push(self, priority: float, item: Any):
         """
@@ -97,12 +115,8 @@ class AgingPriorityQueue:
             best_item = None
             best_priority = float('inf')
             
-            item_rates = self._item_rates
-            global_rate = self.aging_rate
-
             for base_p, entry_time, item in self._queue:
-                rate = item_rates.get(item, global_rate)
-                current_priority = base_p - ((now - entry_time) * rate)
+                current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
                 if current_priority < best_priority:
                     best_priority = current_priority
                     best_item = item
@@ -120,12 +134,8 @@ class AgingPriorityQueue:
             now = time.time()
             best_priority = float('inf')
             
-            item_rates = self._item_rates
-            global_rate = self.aging_rate
-
             for base_p, entry_time, item in self._queue:
-                rate = item_rates.get(item, global_rate)
-                current_priority = base_p - ((now - entry_time) * rate)
+                current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
                 if current_priority < best_priority:
                     best_priority = current_priority
 
@@ -144,12 +154,8 @@ class AgingPriorityQueue:
             best_idx = -1
             best_priority = float('inf')
             
-            item_rates = self._item_rates
-            global_rate = self.aging_rate
-
             for i, (base_p, entry_time, item) in enumerate(self._queue):
-                rate = item_rates.get(item, global_rate)
-                current_priority = base_p - ((now - entry_time) * rate)
+                current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
                 if current_priority < best_priority:
                     best_priority = current_priority
                     best_idx = i
@@ -259,8 +265,7 @@ class AgingPriorityQueue:
             now = time.time()
             for base_p, entry_time, queue_item in self._queue:
                 if queue_item == item:
-                    rate = self._item_rates.get(queue_item, self.aging_rate)
-                    return base_p - ((now - entry_time) * rate)
+                    return self._calculate_effective_priority(base_p, entry_time, queue_item, now)
             raise ValueError("item not in priority queue")
 
     def get_base_priority(self, item: Any) -> float:
@@ -283,8 +288,7 @@ class AgingPriorityQueue:
             now = time.time()
             priorities = {}
             for base_p, entry_time, item in self._queue:
-                rate = self._item_rates.get(item, self.aging_rate)
-                priorities[item] = base_p - ((now - entry_time) * rate)
+                priorities[item] = self._calculate_effective_priority(base_p, entry_time, item, now)
             return priorities
 
     def get_priority_details(self, item: Any) -> Dict[str, Any]:
@@ -310,8 +314,7 @@ class AgingPriorityQueue:
             now = time.time()
             tasks_with_priority = []
             for base_p, entry_time, item in self._queue:
-                rate = self._item_rates.get(item, self.aging_rate)
-                effective_priority = base_p - ((now - entry_time) * rate)
+                effective_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
                 tasks_with_priority.append((effective_priority, item))
             
             tasks_with_priority.sort(key=lambda x: x[0])
@@ -323,6 +326,19 @@ class AgingPriorityQueue:
         effective priority order.
         """
         return iter(self.get_sorted_tasks())
+
+    def get_items_in_range(self, min_p: float, max_p: float) -> List[Any]:
+        """
+        Returns a list of items whose current effective priority falls within [min_p, max_p].
+        """
+        with self._lock:
+            now = time.time()
+            result = []
+            for base_p, entry_time, item in self._queue:
+                effective = self._calculate_effective_priority(base_p, entry_time, item, now)
+                if min_p <= effective <= max_p:
+                    result.append(item)
+            return result
 
     def clear(self):
         """

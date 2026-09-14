@@ -254,5 +254,28 @@ class TestAgingPriorityQueue(unittest.TestCase):
         with self.assertRaises(ValueError):
             pq.get_priority_details("Unknown")
 
+    def test_priority_clamping(self):
+        # Set min_priority to 0. Priorities should not go below 0.
+        pq = AgingPriorityQueue(aging_rate=100, min_priority=0)
+        pq.push(10, "Task A")
+        time.sleep(0.5)
+        # Effective: 10 - (0.5 * 100) = -40. Clamped to 0.
+        self.assertEqual(pq.get_current_priority("Task A"), 0)
+        
+        pq.set_min_priority(-10)
+        # Now it should be -10
+        self.assertEqual(pq.get_current_priority("Task A"), -10)
+
+    def test_get_items_in_range(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(1, "High")
+        pq.push(5, "Mid")
+        pq.push(10, "Low")
+        
+        # Range [4, 6] should only contain "Mid"
+        self.assertEqual(pq.get_items_in_range(4, 6), ["Mid"])
+        # Range [0, 6] should contain "High" and "Mid"
+        self.assertCountEqual(pq.get_items_in_range(0, 6), ["High", "Mid"])
+
 if __name__ == "__main__":
     unittest.main()
