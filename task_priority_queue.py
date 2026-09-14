@@ -35,6 +35,14 @@ class AgingPriorityQueue:
                 raise ValueError("item not in priority queue")
             self._item_rates[item] = new_rate
 
+    def reset_all_item_aging_rates(self):
+        """
+        Removes all per-item aging rate overrides, causing all items
+        to use the current global aging rate.
+        """
+        with self._lock:
+            self._item_rates.clear()
+
     def _queue_items(self) -> List[Any]:
         """Internal helper to get all items in the queue."""
         return [entry[2] for entry in self._queue]

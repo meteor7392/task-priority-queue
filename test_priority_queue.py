@@ -191,6 +191,29 @@ class TestAgingPriorityQueue(unittest.TestCase):
         with self.assertRaises(ValueError):
             pq.set_item_aging_rate("Missing", 10)
 
+    def test_reset_all_item_aging_rates(self):
+        """Verify that resetting item aging rates restores global aging behavior."""
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(100, "ItemA")
+        pq.push(100, "ItemB")
+        
+        # ItemA ages fast, ItemB doesn't age
+        pq.set_item_aging_rate("ItemA", 100)
+        time.sleep(0.1)
+        # ItemA priority: 100 - 10 = 90. ItemB priority: 100. ItemA is top.
+        self.assertEqual(pq.peek(), "ItemA")
+        
+        # Reset all. Now both use aging_rate=0
+        pq.reset_all_item_aging_rates()
+        # Now both are 100. Since ItemA was pushed first, it stays first in internal list (heap depends on base priority).
+        # Actually, they are equal. Let's check if the custom rate is gone.
+        pq.set_aging_rate(10)
+        time.sleep(0.1)
+        # If ItemA still had 100 rate, it would be 100 - (0.2*100) = 80
+        # With reset, both have 10 rate: 100 - (0.2*10) = 98
+        # We can verify by checking if they are still competing equally
+        self.assertEqual(pq.get_current_priority("ItemA"), pq.get_current_priority("ItemB"))
+
     def test_pop_all(self):
         pq = AgingPriorityQueue(aging_rate=0)
         pq.push(10, "Low")
