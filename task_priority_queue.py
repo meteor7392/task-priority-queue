@@ -1,7 +1,7 @@
 import heapq
 import time
 from threading import Lock
-from typing import Any, Tuple, Iterator, Generator, List, Dict
+from typing import Any, Tuple, Iterator, Generator, List, Dict, Set
 from contextlib import contextmanager
 
 class AgingPriorityQueue:
@@ -17,6 +17,7 @@ class AgingPriorityQueue:
         self._lock = Lock()
         self.aging_rate = aging_rate
         self._item_rates = {}
+        self._items_set: Set[Any] = set()
 
     def set_aging_rate(self, new_rate: float):
         """
@@ -30,7 +31,7 @@ class AgingPriorityQueue:
         Sets a custom aging rate for a specific item, overriding the global rate.
         """
         with self._lock:
-            if item not in self._queue_items():
+            if item not in self._items_set:
                 raise ValueError("item not in priority queue")
             self._item_rates[item] = new_rate
 
@@ -47,6 +48,7 @@ class AgingPriorityQueue:
             # We store entry time to calculate age during pop
             entry_time = time.time()
             heapq.heappush(self._queue, (priority, entry_time, item))
+            self._items_set.add(item)
 
     def push_many(self, items: List[Tuple[float, Any]]):
         """
@@ -57,6 +59,7 @@ class AgingPriorityQueue:
             now = time.time()
             for priority, item in items:
                 heapq.heappush(self._queue, (priority, now, item))
+                self._items_set.add(item)
 
     def peek(self) -> Any:
         """
@@ -104,9 +107,10 @@ class AgingPriorityQueue:
             # Remove the best element
             item = self._queue[best_idx][2]
             
-            # Cleanup item rate if it was custom
+            # Cleanup item rate and membership
             if item in self._item_rates:
                 del self._item_rates[item]
+            self._items_set.remove(item)
             
             # To maintain heap property after removing an arbitrary index:
             # 1. Swap with the last element
@@ -146,6 +150,7 @@ class AgingPriorityQueue:
 
             if item in self._item_rates:
                 del self._item_rates[item]
+            self._items_set.remove(item)
 
             last_element = self._queue.pop()
             if idx < len(self._queue):
@@ -224,6 +229,7 @@ class AgingPriorityQueue:
         with self._lock:
             self._queue.clear()
             self._item_rates.clear()
+            self._items_set.clear()
 
     @contextmanager
     def priority_boost(self, item: Any, boost_amount: float) -> Generator[None, None, None]:
@@ -268,16 +274,22 @@ class AgingPriorityQueue:
         with self._lock:
             return len(self._queue) == 0
 
-    def __len__(self):
+    def size(self) -> int:
+        """
+        Returns the current number of items in the queue.
+        """
         with self._lock:
             return len(self._queue)
+
+    def __len__(self):
+        return self.size()
 
     def __contains__(self, item: Any) -> bool:
         """
         Checks if an item is currently in the queue.
         """
         with self._lock:
-            return any(entry[2] == item for entry in self._queue)
+            return item in self._items_set
 
     def __iter__(self) -> Iterator[Any]:
         """
