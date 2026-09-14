@@ -224,5 +224,13 @@ class TestAgingPriorityQueue(unittest.TestCase):
         self.assertEqual(results, ["High", "Medium", "Low"])
         self.assertTrue(pq.is_empty())
 
+    def test_get_all_current_priorities(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "A")
+        pq.push(20, "B")
+        priorities = pq.get_all_current_priorities()
+        self.assertEqual(priorities["A"], 10)
+        self.assertEqual(priorities["B"], 20)
+
 if __name__ == "__main__":
     unittest.main()

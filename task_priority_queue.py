@@ -227,6 +227,19 @@ class AgingPriorityQueue:
                     return base_p - ((now - entry_time) * rate)
             raise ValueError("item not in priority queue")
 
+    def get_all_current_priorities(self) -> Dict[Any, float]:
+        """
+        Returns a dictionary mapping all items in the queue to their current
+        calculated priorities.
+        """
+        with self._lock:
+            now = time.time()
+            priorities = {}
+            for base_p, entry_time, item in self._queue:
+                rate = self._item_rates.get(item, self.aging_rate)
+                priorities[item] = base_p - ((now - entry_time) * rate)
+            return priorities
+
     def get_priority_details(self, item: Any) -> Dict[str, Any]:
         """
         Returns the base priority and entry time of an item.
