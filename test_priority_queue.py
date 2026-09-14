@@ -191,6 +191,18 @@ class TestAgingPriorityQueue(unittest.TestCase):
         with self.assertRaises(ValueError):
             pq.set_item_aging_rate("Missing", 10)
 
+    def test_remove_item_aging_rate(self):
+        """Verify that removing an item aging rate reverts it to the global rate."""
+        pq = AgingPriorityQueue(aging_rate=10)
+        pq.push(100, "Item")
+        
+        pq.set_item_aging_rate("Item", 100)
+        initial_p = pq.get_current_priority("Item")
+        
+        pq.remove_item_aging_rate("Item")
+        # Now it uses aging_rate=10 instead of 100. Priority should be higher (numerically larger).
+        self.assertGreater(pq.get_current_priority("Item"), initial_p)
+
     def test_reset_all_item_aging_rates(self):
         """Verify that resetting item aging rates restores global aging behavior."""
         pq = AgingPriorityQueue(aging_rate=0)
@@ -231,6 +243,16 @@ class TestAgingPriorityQueue(unittest.TestCase):
         priorities = pq.get_all_current_priorities()
         self.assertEqual(priorities["A"], 10)
         self.assertEqual(priorities["B"], 20)
+
+    def test_get_priority_details(self):
+        pq = AgingPriorityQueue()
+        pq.push(15, "Task X")
+        details = pq.get_priority_details("Task X")
+        self.assertEqual(details["base_priority"], 15)
+        self.assertIsInstance(details["entry_time"], float)
+        
+        with self.assertRaises(ValueError):
+            pq.get_priority_details("Unknown")
 
 if __name__ == "__main__":
     unittest.main()

@@ -35,6 +35,16 @@ class AgingPriorityQueue:
                 raise ValueError("item not in priority queue")
             self._item_rates[item] = new_rate
 
+    def remove_item_aging_rate(self, item: Any):
+        """
+        Removes the custom aging rate for a specific item, reverting it to the global rate.
+        """
+        with self._lock:
+            if item not in self._items_set:
+                raise ValueError("item not in priority queue")
+            if item in self._item_rates:
+                del self._item_rates[item]
+
     def reset_all_item_aging_rates(self):
         """
         Removes all per-item aging rate overrides, causing all items
