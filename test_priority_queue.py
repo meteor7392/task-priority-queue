@@ -173,5 +173,23 @@ class TestAgingPriorityQueue(unittest.TestCase):
         # NewHigh effective: 10 - (0 * 100) approx = 10
         self.assertEqual(pq.peek(), "OldLow")
 
+    def test_set_item_aging_rate(self):
+        """Verify that per-item aging rates override the global rate."""
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(100, "SlowAger")
+        pq.push(100, "FastAger")
+        
+        # Set FastAger to age quickly
+        pq.set_item_aging_rate("FastAger", 100)
+        
+        time.sleep(1.1)
+        
+        # FastAger should now be priority ~ 0, SlowAger remains 100
+        self.assertEqual(pq.peek(), "FastAger")
+        
+        # Test updating non-existent item
+        with self.assertRaises(ValueError):
+            pq.set_item_aging_rate("Missing", 10)
+
 if __name__ == "__main__":
     unittest.main()

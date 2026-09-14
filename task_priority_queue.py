@@ -16,6 +16,7 @@ class AgingPriorityQueue:
         self._queue = []
         self._lock = Lock()
         self.aging_rate = aging_rate
+        self._item_rates = {}
 
     def set_aging_rate(self, new_rate: float):
         """
@@ -23,6 +24,19 @@ class AgingPriorityQueue:
         """
         with self._lock:
             self.aging_rate = new_rate
+
+    def set_item_aging_rate(self, item: Any, new_rate: float):
+        """
+        Sets a custom aging rate for a specific item, overriding the global rate.
+        """
+        with self._lock:
+            if item not in self._queue_items():
+                raise ValueError("item not in priority queue")
+            self._item_rates[item] = new_rate
+
+    def _queue_items(self) -> List[Any]:
+        """Internal helper to get all items in the queue."""
+        return [entry[2] for entry in self._queue]
 
     def push(self, priority: float, item: Any):
         """
@@ -54,15 +68,12 @@ class AgingPriorityQueue:
                 raise IndexError("peek from an empty priority queue")
 
             now = time.time()
-            rate = self.aging_rate
             best_item = None
             best_priority = float('inf')
 
-            # Since aging is uniform across all elements, the item that is currently
-            # the highest priority is either the one with the lowest base priority
-            # or the one that has been waiting the longest.
-            # To be accurate with aging, we must find the minimum of (base_p - rate * age).
+            # Since aging can be per-item, we must check all elements
             for base_p, entry_time, item in self._queue:
+                rate = self._item_rates.get(item, self.aging_rate)
                 current_priority = base_p - ((now - entry_time) * rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
@@ -80,11 +91,11 @@ class AgingPriorityQueue:
                 raise IndexError("pop from an empty priority queue")
 
             now = time.time()
-            rate = self.aging_rate
             best_idx = -1
             best_priority = float('inf')
 
             for i, (base_p, entry_time, item) in enumerate(self._queue):
+                rate = self._item_rates.get(item, self.aging_rate)
                 current_priority = base_p - ((now - entry_time) * rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
@@ -92,6 +103,10 @@ class AgingPriorityQueue:
 
             # Remove the best element
             item = self._queue[best_idx][2]
+            
+            # Cleanup item rate if it was custom
+            if item in self._item_rates:
+                del self._item_rates[item]
             
             # To maintain heap property after removing an arbitrary index:
             # 1. Swap with the last element
@@ -120,6 +135,9 @@ class AgingPriorityQueue:
             
             if idx == -1:
                 raise ValueError("item not in priority queue")
+
+            if item in self._item_rates:
+                del self._item_rates[item]
 
             last_element = self._queue.pop()
             if idx < len(self._queue):
@@ -155,9 +173,9 @@ class AgingPriorityQueue:
         """
         with self._lock:
             now = time.time()
-            rate = self.aging_rate
             for base_p, entry_time, queue_item in self._queue:
                 if queue_item == item:
+                    rate = self._item_rates.get(queue_item, self.aging_rate)
                     return base_p - ((now - entry_time) * rate)
             raise ValueError("item not in priority queue")
 
@@ -182,9 +200,9 @@ class AgingPriorityQueue:
         """
         with self._lock:
             now = time.time()
-            rate = self.aging_rate
             tasks_with_priority = []
             for base_p, entry_time, item in self._queue:
+                rate = self._item_rates.get(item, self.aging_rate)
                 effective_priority = base_p - ((now - entry_time) * rate)
                 tasks_with_priority.append((effective_priority, item))
             
@@ -197,6 +215,7 @@ class AgingPriorityQueue:
         """
         with self._lock:
             self._queue.clear()
+            self._item_rates.clear()
 
     @contextmanager
     def priority_boost(self, item: Any, boost_amount: float) -> Generator[None, None, None]:
