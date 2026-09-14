@@ -100,7 +100,6 @@ class AgingPriorityQueue:
             item_rates = self._item_rates
             global_rate = self.aging_rate
 
-            # Since aging can be per-item, we must check all elements
             for base_p, entry_time, item in self._queue:
                 rate = item_rates.get(item, global_rate)
                 current_priority = base_p - ((now - entry_time) * rate)
@@ -155,22 +154,15 @@ class AgingPriorityQueue:
                     best_priority = current_priority
                     best_idx = i
 
-            # Remove the best element
             item = self._queue[best_idx][2]
             
-            # Cleanup item rate and membership
             if item in self._item_rates:
                 del self._item_rates[item]
             self._items_set.remove(item)
             
-            # To maintain heap property after removing an arbitrary index:
-            # 1. Swap with the last element
-            # 2. Pop the last element
-            # 3. Restore heap property for the swapped element
             last_element = self._queue.pop()
             if best_idx < len(self._queue):
                 self._queue[best_idx] = last_element
-                # Sift down and up to reposition the element
                 heapq._siftdown(self._queue, 0, best_idx)
                 heapq._siftup(self._queue, best_idx)
             
@@ -244,6 +236,17 @@ class AgingPriorityQueue:
                 if queue_item == item:
                     rate = self._item_rates.get(queue_item, self.aging_rate)
                     return base_p - ((now - entry_time) * rate)
+            raise ValueError("item not in priority queue")
+
+    def get_base_priority(self, item: Any) -> float:
+        """
+        Returns the original base priority of an item without aging.
+        Raises ValueError if the item is not found.
+        """
+        with self._lock:
+            for base_p, _, queue_item in self._queue:
+                if queue_item == item:
+                    return base_p
             raise ValueError("item not in priority queue")
 
     def get_all_current_priorities(self) -> Dict[Any, float]:
