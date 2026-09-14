@@ -225,6 +225,31 @@ class AgingPriorityQueue:
             heapq._siftdown(self._queue, 0, idx)
             heapq._siftup(self._queue, idx)
 
+    def adjust_priority(self, item: Any, delta: float):
+        """
+        Adjusts the base priority of an existing item by a given delta.
+        Positive delta decreases priority (increases value), negative increases priority.
+        Raises ValueError if the item is not found.
+        """
+        if not isinstance(delta, (int, float)):
+            raise TypeError("Delta must be a number")
+
+        with self._lock:
+            idx = -1
+            for i, entry in enumerate(self._queue):
+                if entry[2] == item:
+                    idx = i
+                    break
+            
+            if idx == -1:
+                raise ValueError("item not in priority queue")
+
+            base_p, entry_time, _ = self._queue[idx]
+            self._queue[idx] = (base_p + delta, entry_time, item)
+            
+            heapq._siftdown(self._queue, 0, idx)
+            heapq._siftup(self._queue, idx)
+
     def get_current_priority(self, item: Any) -> float:
         """
         Returns the current calculated priority of an item, accounting for aging.
