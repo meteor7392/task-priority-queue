@@ -280,6 +280,13 @@ class AgingPriorityQueue:
             tasks_with_priority.sort(key=lambda x: x[0])
             return [item for _, item in tasks_with_priority]
 
+    def get_sorted_iterator(self) -> Iterator[Any]:
+        """
+        Returns an iterator that yields items in their current
+        effective priority order.
+        """
+        return iter(self.get_sorted_tasks())
+
     def clear(self):
         """
         Removes all items from the queue.
@@ -354,10 +361,11 @@ class AgingPriorityQueue:
 
     def __iter__(self) -> Iterator[Any]:
         """
-        Returns an iterator over the items currently in the queue.
+        Returns an iterator over the items currently in the queue
+        in the order they are stored internally.
         """
         with self._lock:
-            return iter([entry[2] for entry in self._queue])
+            return iter(self._queue_items())
 
     def __repr__(self) -> str:
         """
