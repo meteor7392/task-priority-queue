@@ -10,6 +10,15 @@ class TestAgingPriorityQueue(unittest.TestCase):
         self.assertEqual(pq.pop(), "High")
         self.assertEqual(pq.pop(), "Low")
 
+    def test_push_many(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        tasks = [(10, "Low"), (1, "High"), (5, "Medium")]
+        pq.push_many(tasks)
+        self.assertEqual(len(pq), 3)
+        self.assertEqual(pq.pop(), "High")
+        self.assertEqual(pq.pop(), "Medium")
+        self.assertEqual(pq.pop(), "Low")
+
     def test_aging_mechanism(self):
         # High aging rate to make the effect immediate
         pq = AgingPriorityQueue(aging_rate=100)

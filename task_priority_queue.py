@@ -34,6 +34,16 @@ class AgingPriorityQueue:
             entry_time = time.time()
             heapq.heappush(self._queue, (priority, entry_time, item))
 
+    def push_many(self, items: List[Tuple[float, Any]]):
+        """
+        Adds multiple items to the queue in a single lock acquisition.
+        :param items: A list of tuples (priority, item).
+        """
+        with self._lock:
+            now = time.time()
+            for priority, item in items:
+                heapq.heappush(self._queue, (priority, now, item))
+
     def peek(self) -> Any:
         """
         Returns the item with the highest priority (lowest numerical value),
