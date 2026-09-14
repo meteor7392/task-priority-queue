@@ -96,10 +96,13 @@ class AgingPriorityQueue:
             now = time.time()
             best_item = None
             best_priority = float('inf')
+            
+            item_rates = self._item_rates
+            global_rate = self.aging_rate
 
             # Since aging can be per-item, we must check all elements
             for base_p, entry_time, item in self._queue:
-                rate = self._item_rates.get(item, self.aging_rate)
+                rate = item_rates.get(item, global_rate)
                 current_priority = base_p - ((now - entry_time) * rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
@@ -117,9 +120,12 @@ class AgingPriorityQueue:
 
             now = time.time()
             best_priority = float('inf')
+            
+            item_rates = self._item_rates
+            global_rate = self.aging_rate
 
             for base_p, entry_time, item in self._queue:
-                rate = self._item_rates.get(item, self.aging_rate)
+                rate = item_rates.get(item, global_rate)
                 current_priority = base_p - ((now - entry_time) * rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
@@ -138,9 +144,12 @@ class AgingPriorityQueue:
             now = time.time()
             best_idx = -1
             best_priority = float('inf')
+            
+            item_rates = self._item_rates
+            global_rate = self.aging_rate
 
             for i, (base_p, entry_time, item) in enumerate(self._queue):
-                rate = self._item_rates.get(item, self.aging_rate)
+                rate = item_rates.get(item, global_rate)
                 current_priority = base_p - ((now - entry_time) * rate)
                 if current_priority < best_priority:
                     best_priority = current_priority
@@ -349,6 +358,13 @@ class AgingPriorityQueue:
         with self._lock:
             return len(self._queue)
 
+    def contains(self, item: Any) -> bool:
+        """
+        Returns True if the item is in the queue, False otherwise.
+        """
+        with self._lock:
+            return item in self._items_set
+
     def __len__(self):
         return self.size()
 
@@ -356,8 +372,7 @@ class AgingPriorityQueue:
         """
         Checks if an item is currently in the queue.
         """
-        with self._lock:
-            return item in self._items_set
+        return self.contains(item)
 
     def __iter__(self) -> Iterator[Any]:
         """
