@@ -121,6 +121,14 @@ class AgingPriorityQueue:
             
             return item
 
+    def pop_all(self) -> Generator[Any, None, None]:
+        """
+        Yields items from the queue one by one in priority order
+        until the queue is empty.
+        """
+        while not self.is_empty():
+            yield self.pop()
+
     def remove(self, item: Any):
         """
         Removes a specific item from the queue if it exists.

@@ -191,5 +191,15 @@ class TestAgingPriorityQueue(unittest.TestCase):
         with self.assertRaises(ValueError):
             pq.set_item_aging_rate("Missing", 10)
 
+    def test_pop_all(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "Low")
+        pq.push(1, "High")
+        pq.push(5, "Medium")
+        
+        results = list(pq.pop_all())
+        self.assertEqual(results, ["High", "Medium", "Low"])
+        self.assertTrue(pq.is_empty())
+
 if __name__ == "__main__":
     unittest.main()
