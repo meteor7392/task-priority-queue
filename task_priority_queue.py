@@ -379,6 +379,13 @@ class AgingPriorityQueue:
                     result.append(item)
             return result
 
+    def get_all_items(self) -> Set[Any]:
+        """
+        Returns a set of all items currently in the queue.
+        """
+        with self._lock:
+            return set(self._items_set)
+
     def clear(self):
         """
         Removes all items from the queue.
