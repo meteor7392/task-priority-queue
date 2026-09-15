@@ -105,6 +105,7 @@ class AgingPriorityQueue:
         with self._lock:
             # We store entry time to calculate age during pop
             entry_time = time.time()
+            # The heap naturally orders by priority then entry_time (FIFO tie-break)
             heapq.heappush(self._queue, (priority, entry_time, item))
             self._items_set.add(item)
 
@@ -121,6 +122,35 @@ class AgingPriorityQueue:
                 heapq.heappush(self._queue, (priority, now, item))
                 self._items_set.add(item)
 
+    def _find_best_entry(self, now: float) -> Tuple[int, Tuple[float, float, Any]]:
+        """Internal helper to find the item with the highest effective priority."""
+        # Optimization: If there are no per-item rates, the heap root is always the best 
+        # because all items age at the same rate relative to their entry time.
+        # effective_p = base_p - (now - entry_time) * global_rate
+        # effective_p = (base_p + entry_time * global_rate) - now * global_rate
+        # However, the current heap is sorted by (base_p, entry_time). 
+        # Since we support per-item rates, we must scan unless _item_rates is empty.
+        
+        if not self._item_rates:
+            # With uniform aging, the root of the min-heap (base_p, entry_time) 
+            # is the highest priority candidate.
+            return 0, self._queue[0]
+
+        best_idx = -1
+        best_priority = float('inf')
+        
+        for i, (base_p, entry_time, item) in enumerate(self._queue):
+            current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
+            if current_priority < best_priority:
+                best_priority = current_priority
+                best_idx = i
+            elif current_priority == best_priority:
+                # Stability: prefer older item if priorities are equal
+                if best_idx != -1 and entry_time < self._queue[best_idx][1]:
+                    best_idx = i
+
+        return best_idx, self._queue[best_idx]
+
     def peek(self) -> Any:
         """
         Returns the item with the highest priority (lowest numerical value),
@@ -130,22 +160,8 @@ class AgingPriorityQueue:
             if not self._queue:
                 raise QueueEmptyError("peek from an empty priority queue")
 
-            now = time.time()
-            best_item = None
-            best_priority = float('inf')
-            
-            # Since it's a min-heap on base_priority, we can potentially prune
-            # However, since aging rates can be different per item, we must check all
-            # unless we track the maximum aging rate. For simplicity and correctness
-            # with per-item rates, we scan, but this structure allows for future
-            # optimization if rates are uniform.
-            for base_p, entry_time, item in self._queue:
-                current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
-                if current_priority < best_priority:
-                    best_priority = current_priority
-                    best_item = item
-
-            return best_item
+            _, entry = self._find_best_entry(time.time())
+            return entry[2]
 
     def get_top_priority(self) -> float:
         """
@@ -156,14 +172,8 @@ class AgingPriorityQueue:
                 raise QueueEmptyError("get_top_priority from an empty priority queue")
 
             now = time.time()
-            best_priority = float('inf')
-            
-            for base_p, entry_time, item in self._queue:
-                current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
-                if current_priority < best_priority:
-                    best_priority = current_priority
-
-            return best_priority
+            idx, entry = self._find_best_entry(now)
+            return self._calculate_effective_priority(entry[0], entry[1], entry[2], now)
 
     def get_top_item_details(self) -> Dict[str, Any]:
         """
@@ -174,22 +184,13 @@ class AgingPriorityQueue:
                 raise QueueEmptyError("get_top_item_details from an empty priority queue")
 
             now = time.time()
-            best_entry = None
-            best_priority = float('inf')
-            
-            for entry in self._queue:
-                base_p, entry_time, item = entry
-                current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
-                if current_priority < best_priority:
-                    best_priority = current_priority
-                    best_entry = entry
-
-            base_p, entry_time, item = best_entry
+            idx, entry = self._find_best_entry(now)
+            base_p, entry_time, item = entry
             return {
                 "item": item,
                 "base_priority": base_p,
                 "entry_time": entry_time,
-                "effective_priority": best_priority
+                "effective_priority": self._calculate_effective_priority(base_p, entry_time, item, now)
             }
 
     def get_bottom_item_details(self) -> Dict[str, Any]:
@@ -229,17 +230,8 @@ class AgingPriorityQueue:
             if not self._queue:
                 raise QueueEmptyError("pop from an empty priority queue")
 
-            now = time.time()
-            best_idx = -1
-            best_priority = float('inf')
-            
-            for i, (base_p, entry_time, item) in enumerate(self._queue):
-                current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
-                if current_priority < best_priority:
-                    best_priority = current_priority
-                    best_idx = i
-
-            item = self._queue[best_idx][2]
+            best_idx, entry = self._find_best_entry(time.time())
+            item = entry[2]
             
             if item in self._item_rates:
                 del self._item_rates[item]
@@ -373,10 +365,11 @@ class AgingPriorityQueue:
             tasks_with_priority = []
             for base_p, entry_time, item in self._queue:
                 effective_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
-                tasks_with_priority.append((effective_priority, item))
+                tasks_with_priority.append((effective_priority, entry_time, item))
             
-            tasks_with_priority.sort(key=lambda x: x[0])
-            return [item for _, item in tasks_with_priority]
+            # Sort by effective priority, then by entry_time for stability
+            tasks_with_priority.sort()
+            return [item for _, _, item in tasks_with_priority]
 
     def get_sorted_iterator(self) -> Iterator[Any]:
         """
