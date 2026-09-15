@@ -79,6 +79,13 @@ class AgingPriorityQueue:
         """Internal helper to get all items in the queue."""
         return [entry[2] for entry in self._queue]
 
+    def _find_item_index(self, item: Any) -> int:
+        """Internal helper to find the index of an item in the queue. Raises ItemNotFoundError if not found."""
+        for i, entry in enumerate(self._queue):
+            if entry[2] == item:
+                return i
+        raise ItemNotFoundError("item not in priority queue")
+
     def _calculate_effective_priority(self, base_p: float, entry_time: float, item: Any, now: float) -> float:
         """Internal helper to calculate clamped effective priority."""
         rate = self._item_rates.get(item, self.aging_rate)
@@ -260,14 +267,7 @@ class AgingPriorityQueue:
         Raises ItemNotFoundError if the item is not found.
         """
         with self._lock:
-            idx = -1
-            for i, entry in enumerate(self._queue):
-                if entry[2] == item:
-                    idx = i
-                    break
-            
-            if idx == -1:
-                raise ItemNotFoundError("item not in priority queue")
+            idx = self._find_item_index(item)
 
             if item in self._item_rates:
                 del self._item_rates[item]
@@ -288,14 +288,7 @@ class AgingPriorityQueue:
             raise TypeError("Priority must be a number")
 
         with self._lock:
-            idx = -1
-            for i, entry in enumerate(self._queue):
-                if entry[2] == item:
-                    idx = i
-                    break
-            
-            if idx == -1:
-                raise ItemNotFoundError("item not in priority queue")
+            idx = self._find_item_index(item)
 
             entry_time = self._queue[idx][1]
             self._queue[idx] = (new_priority, entry_time, item)
@@ -313,14 +306,7 @@ class AgingPriorityQueue:
             raise TypeError("Delta must be a number")
 
         with self._lock:
-            idx = -1
-            for i, entry in enumerate(self._queue):
-                if entry[2] == item:
-                    idx = i
-                    break
-            
-            if idx == -1:
-                raise ItemNotFoundError("item not in priority queue")
+            idx = self._find_item_index(item)
 
             base_p, entry_time, _ = self._queue[idx]
             self._queue[idx] = (base_p + delta, entry_time, item)
@@ -438,14 +424,7 @@ class AgingPriorityQueue:
             raise TypeError("Boost amount must be a number")
 
         with self._lock:
-            idx = -1
-            for i, entry in enumerate(self._queue):
-                if entry[2] == item:
-                    idx = i
-                    break
-            
-            if idx == -1:
-                raise ItemNotFoundError("item not in priority queue")
+            idx = self._find_item_index(item)
             
             old_priority, entry_time, _ = self._queue[idx]
             self._queue[idx] = (old_priority - boost_amount, entry_time, item)
@@ -456,16 +435,14 @@ class AgingPriorityQueue:
             yield
         finally:
             with self._lock:
-                idx = -1
-                for i, entry in enumerate(self._queue):
-                    if entry[2] == item:
-                        idx = i
-                        break
-                if idx != -1:
+                try:
+                    idx = self._find_item_index(item)
                     _, entry_time, _ = self._queue[idx]
                     self._queue[idx] = (old_priority, entry_time, item)
                     heapq._siftdown(self._queue, 0, idx)
                     heapq._siftup(self._queue, idx)
+                except ItemNotFoundError:
+                    pass
 
     def is_empty(self) -> bool:
         """
