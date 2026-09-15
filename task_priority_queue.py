@@ -4,6 +4,18 @@ from threading import Lock
 from typing import Any, Tuple, Iterator, Generator, List, Dict, Set, Optional
 from contextlib import contextmanager
 
+class PriorityQueueError(Exception):
+    """Base exception for AgingPriorityQueue errors."""
+    pass
+
+class ItemNotFoundError(PriorityQueueError):
+    """Raised when an item is not found in the queue."""
+    pass
+
+class QueueEmptyError(PriorityQueueError, IndexError):
+    """Raised when performing an operation on an empty queue."""
+    pass
+
 class AgingPriorityQueue:
     """
     A Priority Queue where the priority of an item increases (numerically decreases)
@@ -42,7 +54,7 @@ class AgingPriorityQueue:
         """
         with self._lock:
             if item not in self._items_set:
-                raise ValueError("item not in priority queue")
+                raise ItemNotFoundError("item not in priority queue")
             self._item_rates[item] = new_rate
 
     def remove_item_aging_rate(self, item: Any):
@@ -51,7 +63,7 @@ class AgingPriorityQueue:
         """
         with self._lock:
             if item not in self._items_set:
-                raise ValueError("item not in priority queue")
+                raise ItemNotFoundError("item not in priority queue")
             if item in self._item_rates:
                 del self._item_rates[item]
 
@@ -109,7 +121,7 @@ class AgingPriorityQueue:
         """
         with self._lock:
             if not self._queue:
-                raise IndexError("peek from an empty priority queue")
+                raise QueueEmptyError("peek from an empty priority queue")
 
             now = time.time()
             best_item = None
@@ -129,7 +141,7 @@ class AgingPriorityQueue:
         """
         with self._lock:
             if not self._queue:
-                raise IndexError("get_top_priority from an empty priority queue")
+                raise QueueEmptyError("get_top_priority from an empty priority queue")
 
             now = time.time()
             best_priority = float('inf')
@@ -148,7 +160,7 @@ class AgingPriorityQueue:
         """
         with self._lock:
             if not self._queue:
-                raise IndexError("pop from an empty priority queue")
+                raise QueueEmptyError("pop from an empty priority queue")
 
             now = time.time()
             best_idx = -1
@@ -185,7 +197,7 @@ class AgingPriorityQueue:
     def remove(self, item: Any):
         """
         Removes a specific item from the queue if it exists.
-        Raises ValueError if the item is not found.
+        Raises ItemNotFoundError if the item is not found.
         """
         with self._lock:
             idx = -1
@@ -195,7 +207,7 @@ class AgingPriorityQueue:
                     break
             
             if idx == -1:
-                raise ValueError("item not in priority queue")
+                raise ItemNotFoundError("item not in priority queue")
 
             if item in self._item_rates:
                 del self._item_rates[item]
@@ -210,7 +222,7 @@ class AgingPriorityQueue:
     def update_priority(self, item: Any, new_priority: float):
         """
         Updates the base priority of an existing item while preserving its entry time.
-        Raises ValueError if the item is not found.
+        Raises ItemNotFoundError if the item is not found.
         """
         if not isinstance(new_priority, (int, float)):
             raise TypeError("Priority must be a number")
@@ -223,7 +235,7 @@ class AgingPriorityQueue:
                     break
             
             if idx == -1:
-                raise ValueError("item not in priority queue")
+                raise ItemNotFoundError("item not in priority queue")
 
             entry_time = self._queue[idx][1]
             self._queue[idx] = (new_priority, entry_time, item)
@@ -235,7 +247,7 @@ class AgingPriorityQueue:
         """
         Adjusts the base priority of an existing item by a given delta.
         Positive delta decreases priority (increases value), negative increases priority.
-        Raises ValueError if the item is not found.
+        Raises ItemNotFoundError if the item is not found.
         """
         if not isinstance(delta, (int, float)):
             raise TypeError("Delta must be a number")
@@ -248,7 +260,7 @@ class AgingPriorityQueue:
                     break
             
             if idx == -1:
-                raise ValueError("item not in priority queue")
+                raise ItemNotFoundError("item not in priority queue")
 
             base_p, entry_time, _ = self._queue[idx]
             self._queue[idx] = (base_p + delta, entry_time, item)
@@ -259,25 +271,25 @@ class AgingPriorityQueue:
     def get_current_priority(self, item: Any) -> float:
         """
         Returns the current calculated priority of an item, accounting for aging.
-        Raises ValueError if the item is not found.
+        Raises ItemNotFoundError if the item is not found.
         """
         with self._lock:
             now = time.time()
             for base_p, entry_time, queue_item in self._queue:
                 if queue_item == item:
                     return self._calculate_effective_priority(base_p, entry_time, queue_item, now)
-            raise ValueError("item not in priority queue")
+            raise ItemNotFoundError("item not in priority queue")
 
     def get_base_priority(self, item: Any) -> float:
         """
         Returns the original base priority of an item without aging.
-        Raises ValueError if the item is not found.
+        Raises ItemNotFoundError if the item is not found.
         """
         with self._lock:
             for base_p, _, queue_item in self._queue:
                 if queue_item == item:
                     return base_p
-            raise ValueError("item not in priority queue")
+            raise ItemNotFoundError("item not in priority queue")
 
     def get_all_current_priorities(self) -> Dict[Any, float]:
         """
@@ -294,7 +306,7 @@ class AgingPriorityQueue:
     def get_priority_details(self, item: Any) -> Dict[str, Any]:
         """
         Returns the base priority and entry time of an item.
-        Raises ValueError if the item is not found.
+        Raises ItemNotFoundError if the item is not found.
         """
         with self._lock:
             for base_p, entry_time, queue_item in self._queue:
@@ -303,7 +315,7 @@ class AgingPriorityQueue:
                         "base_priority": base_p,
                         "entry_time": entry_time
                     }
-            raise ValueError("item not in priority queue")
+            raise ItemNotFoundError("item not in priority queue")
 
     def get_sorted_tasks(self) -> List[Any]:
         """
@@ -366,7 +378,7 @@ class AgingPriorityQueue:
                     break
             
             if idx == -1:
-                raise ValueError("item not in priority queue")
+                raise ItemNotFoundError("item not in priority queue")
             
             old_priority, entry_time, _ = self._queue[idx]
             self._queue[idx] = (old_priority - boost_amount, entry_time, item)
