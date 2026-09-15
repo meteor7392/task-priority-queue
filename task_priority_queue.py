@@ -153,6 +153,33 @@ class AgingPriorityQueue:
 
             return best_priority
 
+    def get_top_item_details(self) -> Dict[str, Any]:
+        """
+        Returns the details (item, base_priority, entry_time) of the item that would be popped next.
+        """
+        with self._lock:
+            if not self._queue:
+                raise QueueEmptyError("get_top_item_details from an empty priority queue")
+
+            now = time.time()
+            best_entry = None
+            best_priority = float('inf')
+            
+            for entry in self._queue:
+                base_p, entry_time, item = entry
+                current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
+                if current_priority < best_priority:
+                    best_priority = current_priority
+                    best_entry = entry
+
+            base_p, entry_time, item = best_entry
+            return {
+                "item": item,
+                "base_priority": base_p,
+                "entry_time": entry_time,
+                "effective_priority": best_priority
+            }
+
     def pop(self) -> Any:
         """
         Removes and returns the item with the highest priority (lowest numerical value),
