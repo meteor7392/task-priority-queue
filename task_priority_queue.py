@@ -127,6 +127,11 @@ class AgingPriorityQueue:
             best_item = None
             best_priority = float('inf')
             
+            # Since it's a min-heap on base_priority, we can potentially prune
+            # However, since aging rates can be different per item, we must check all
+            # unless we track the maximum aging rate. For simplicity and correctness
+            # with per-item rates, we scan, but this structure allows for future
+            # optimization if rates are uniform.
             for base_p, entry_time, item in self._queue:
                 current_priority = self._calculate_effective_priority(base_p, entry_time, item, now)
                 if current_priority < best_priority:
