@@ -1,6 +1,6 @@
 import unittest
 import time
-from task_priority_queue import AgingPriorityQueue
+from task_priority_queue import AgingPriorityQueue, ItemNotFoundError, QueueEmptyError
 
 class TestAgingPriorityQueue(unittest.TestCase):
     def test_basic_priority(self):
@@ -42,12 +42,12 @@ class TestAgingPriorityQueue(unittest.TestCase):
 
     def test_empty_pop(self):
         pq = AgingPriorityQueue()
-        with self.assertRaises(IndexError):
+        with self.assertRaises(QueueEmptyError):
             pq.pop()
 
     def test_empty_peek(self):
         pq = AgingPriorityQueue()
-        with self.assertRaises(IndexError):
+        with self.assertRaises(QueueEmptyError):
             pq.peek()
 
     def test_contains(self):
@@ -79,7 +79,7 @@ class TestAgingPriorityQueue(unittest.TestCase):
         self.assertNotIn("Task B", pq)
         self.assertEqual(len(pq), 2)
         
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ItemNotFoundError):
             pq.remove("Task D")
 
     def test_update_priority(self):
@@ -94,8 +94,8 @@ class TestAgingPriorityQueue(unittest.TestCase):
         pq.update_priority("Task A", 2)
         self.assertEqual(pq.peek(), "Task A")
         
-        # Ensure update_priority raises ValueError for missing items
-        with self.assertRaises(ValueError):
+        # Ensure update_priority raises ItemNotFoundError for missing items
+        with self.assertRaises(ItemNotFoundError):
             pq.update_priority("Task C", 1)
 
     def test_priority_boost(self):
@@ -188,7 +188,7 @@ class TestAgingPriorityQueue(unittest.TestCase):
         self.assertEqual(pq.peek(), "FastAger")
         
         # Test updating non-existent item
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ItemNotFoundError):
             pq.set_item_aging_rate("Missing", 10)
 
     def test_remove_item_aging_rate(self):
@@ -251,7 +251,7 @@ class TestAgingPriorityQueue(unittest.TestCase):
         self.assertEqual(details["base_priority"], 15)
         self.assertIsInstance(details["entry_time"], float)
         
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ItemNotFoundError):
             pq.get_priority_details("Unknown")
 
     def test_priority_clamping(self):
