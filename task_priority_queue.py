@@ -57,6 +57,16 @@ class AgingPriorityQueue:
                 raise ItemNotFoundError("item not in priority queue")
             self._item_rates[item] = new_rate
 
+    def update_item_aging_rate(self, item: Any, new_rate: float):
+        """
+        Updates the custom aging rate for a specific item if it already has one.
+        If the item is in the queue but has no custom rate, it will set one.
+        """
+        with self._lock:
+            if item not in self._items_set:
+                raise ItemNotFoundError("item not in priority queue")
+            self._item_rates[item] = new_rate
+
     def remove_item_aging_rate(self, item: Any):
         """
         Removes the custom aging rate for a specific item, reverting it to the global rate.
@@ -455,12 +465,15 @@ class AgingPriorityQueue:
             raise TypeError("Boost amount must be a number")
 
         with self._lock:
-            idx = self._find_item_index(item)
-            
-            old_priority, entry_time, _ = self._queue[idx]
-            self._queue[idx] = (old_priority - boost_amount, entry_time, item)
-            heapq._siftdown(self._queue, 0, idx)
-            heapq._siftup(self._queue, idx)
+            try:
+                idx = self._find_item_index(item)
+                old_priority, entry_time, _ = self._queue[idx]
+                self._queue[idx] = (old_priority - boost_amount, entry_time, item)
+                heapq._siftdown(self._queue, 0, idx)
+                heapq._siftup(self._queue, idx)
+            except ItemNotFoundError:
+                # If item is not in queue, the boost cannot be applied, but we let the context continue
+                pass
 
         try:
             yield
@@ -468,8 +481,10 @@ class AgingPriorityQueue:
             with self._lock:
                 try:
                     idx = self._find_item_index(item)
-                    _, entry_time, _ = self._queue[idx]
-                    self._queue[idx] = (old_priority, entry_time, item)
+                    # We must retrieve the currently boosted priority to revert it
+                    # Since priority_boost just subtracts, we add it back
+                    current_priority, entry_time, _ = self._queue[idx]
+                    self._queue[idx] = (current_priority + boost_amount, entry_time, item)
                     heapq._siftdown(self._queue, 0, idx)
                     heapq._siftup(self._queue, idx)
                 except ItemNotFoundError:
