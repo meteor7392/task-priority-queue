@@ -322,6 +322,29 @@ class AgingPriorityQueue:
             heapq._siftdown(self._queue, 0, idx)
             heapq._siftup(self._queue, idx)
 
+    def update_priorities_many(self, updates: List[Tuple[Any, float]]):
+        """
+        Updates the base priorities of multiple existing items while preserving their entry times.
+        :param updates: A list of tuples (item, new_priority).
+        Raises ItemNotFoundError if any item is not found.
+        Raises TypeError if any priority is not a number.
+        """
+        with self._lock:
+            # Validate all inputs first to ensure atomicity of the update
+            for item, priority in updates:
+                if not isinstance(priority, (int, float)):
+                    raise TypeError(f"Priority for item {item} must be a number")
+                if item not in self._items_set:
+                    raise ItemNotFoundError(f"item {item} not in priority queue")
+
+            for item, priority in updates:
+                idx = self._find_item_index(item)
+                entry_time = self._queue[idx][1]
+                self._queue[idx] = (priority, entry_time, item)
+                
+                heapq._siftdown(self._queue, 0, idx)
+                heapq._siftup(self._queue, idx)
+
     def adjust_priority(self, item: Any, delta: float):
         """
         Adjusts the base priority of an existing item by a given delta.
