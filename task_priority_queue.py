@@ -115,11 +115,12 @@ class AgingPriorityQueue:
         :param items: A list of tuples (priority, item).
         """
         with self._lock:
-            now = time.time()
             for priority, item in items:
                 if not isinstance(priority, (int, float)):
                     raise TypeError(f"Priority for item {item} must be a number")
-                heapq.heappush(self._queue, (priority, now, item))
+                # Using time.time() inside the loop to ensure distinct entry times
+                # for better FIFO stability, though they will be very close.
+                heapq.heappush(self._queue, (priority, time.time(), item))
                 self._items_set.add(item)
 
     def _find_best_entry(self, now: float) -> Tuple[int, Tuple[float, float, Any]]:
@@ -362,6 +363,20 @@ class AgingPriorityQueue:
             priorities = {}
             for base_p, entry_time, item in self._queue:
                 priorities[item] = self._calculate_effective_priority(base_p, entry_time, item, now)
+            return priorities
+
+    def get_priorities_for_items(self, items: List[Any]) -> Dict[Any, float]:
+        """
+        Returns a dictionary mapping the requested items to their current
+        calculated priorities. Only includes items that are present in the queue.
+        """
+        with self._lock:
+            now = time.time()
+            requested_set = set(items)
+            priorities = {}
+            for base_p, entry_time, item in self._queue:
+                if item in requested_set:
+                    priorities[item] = self._calculate_effective_priority(base_p, entry_time, item, now)
             return priorities
 
     def get_priority_details(self, item: Any) -> Dict[str, Any]:

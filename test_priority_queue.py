@@ -19,6 +19,16 @@ class TestAgingPriorityQueue(unittest.TestCase):
         self.assertEqual(pq.pop(), "Medium")
         self.assertEqual(pq.pop(), "Low")
 
+    def test_push_many_stability(self):
+        """Verify that items with equal priority are popped in FIFO order when push_many is used."""
+        pq = AgingPriorityQueue(aging_rate=0)
+        # Same priority, different order
+        tasks = [(10, "First"), (10, "Second"), (10, "Third")]
+        pq.push_many(tasks)
+        self.assertEqual(pq.pop(), "First")
+        self.assertEqual(pq.pop(), "Second")
+        self.assertEqual(pq.pop(), "Third")
+
     def test_aging_mechanism(self):
         # High aging rate to make the effect immediate
         pq = AgingPriorityQueue(aging_rate=100)
@@ -243,6 +253,16 @@ class TestAgingPriorityQueue(unittest.TestCase):
         priorities = pq.get_all_current_priorities()
         self.assertEqual(priorities["A"], 10)
         self.assertEqual(priorities["B"], 20)
+
+    def test_get_priorities_for_items(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "A")
+        pq.push(20, "B")
+        pq.push(30, "C")
+        
+        priorities = pq.get_priorities_for_items(["A", "C", "D"])
+        self.assertEqual(priorities, {"A": 10, "C": 30})
+        self.assertNotIn("D", priorities)
 
     def test_get_priority_details(self):
         pq = AgingPriorityQueue()
