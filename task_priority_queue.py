@@ -305,6 +305,34 @@ class AgingPriorityQueue:
                 heapq._siftdown(self._queue, 0, idx)
                 heapq._siftup(self._queue, idx)
 
+    def remove_many(self, items: List[Any]):
+        """
+        Removes multiple specific items from the queue in a single lock acquisition.
+        Raises ItemNotFoundError if any specified item is not found in the queue.
+        """
+        with self._lock:
+            # Validate all items exist first to maintain atomicity
+            for item in items:
+                if item not in self._items_set:
+                    raise ItemNotFoundError(f"item {item} not in priority queue")
+
+            # Since removing an item changes indices of subsequent items, 
+            # we track which ones to remove and rebuild or remove carefully.
+            # The most stable way for bulk remove in a heap is to filter and re-heapify
+            # if the number of removals is significant, or remove one by one.
+            # Given that remove() handles the sift-down/up, we can use it but must
+            # handle the shifting indices. Alternatively, rebuild the heap.
+            
+            # Use a set for faster lookup
+            to_remove = set(items)
+            self._queue = [entry for entry in self._queue if entry[2] not in to_remove]
+            heapq.heapify(self._queue)
+            
+            for item in to_remove:
+                if item in self._item_rates:
+                    del self._item_rates[item]
+                self._items_set.remove(item)
+
     def update_priority(self, item: Any, new_priority: float):
         """
         Updates the base priority of an existing item while preserving its entry time.

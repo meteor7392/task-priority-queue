@@ -92,6 +92,23 @@ class TestAgingPriorityQueue(unittest.TestCase):
         with self.assertRaises(ItemNotFoundError):
             pq.remove("Task D")
 
+    def test_remove_many(self):
+        pq = AgingPriorityQueue()
+        pq.push(1, "A")
+        pq.push(2, "B")
+        pq.push(3, "C")
+        pq.push(4, "D")
+        
+        pq.remove_many(["A", "C")
+        self.assertNotIn("A", pq)
+        self.assertNotIn("C", pq)
+        self.assertIn("B", pq)
+        self.assertIn("D", pq)
+        self.assertEqual(len(pq), 2)
+        
+        with self.assertRaises(ItemNotFoundError):
+            pq.remove_many(["B", "Missing"])
+
     def test_update_priority(self):
         pq = AgingPriorityQueue(aging_rate=0)
         pq.push(10, "Task A")
