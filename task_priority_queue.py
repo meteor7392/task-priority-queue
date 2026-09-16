@@ -193,6 +193,29 @@ class AgingPriorityQueue:
                 "effective_priority": self._calculate_effective_priority(base_p, entry_time, item, now)
             }
 
+    def peek_bottom(self) -> Any:
+        """
+        Returns the item with the lowest priority (highest numerical value),
+        accounting for aging, without removing it from the queue.
+        """
+        with self._lock:
+            if not self._queue:
+                raise QueueEmptyError("peek_bottom from an empty priority queue")
+            
+            details = self.get_bottom_item_details()
+            return details["item"]
+
+    def get_bottom_priority(self) -> float:
+        """
+        Returns the effective priority value of the item with the lowest priority.
+        """
+        with self._lock:
+            if not self._queue:
+                raise QueueEmptyError("get_bottom_priority from an empty priority queue")
+            
+            details = self.get_bottom_item_details()
+            return details["effective_priority"]
+
     def get_bottom_item_details(self) -> Dict[str, Any]:
         """
         Returns the details (item, base_priority, entry_time) of the item that has the lowest
