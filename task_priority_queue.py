@@ -67,6 +67,24 @@ class AgingPriorityQueue:
                 raise ItemNotFoundError("item not in priority queue")
             self._item_rates[item] = new_rate
 
+    def update_item_aging_rates_many(self, updates: List[Tuple[Any, float]]):
+        """
+        Updates the custom aging rates for multiple items in a single lock acquisition.
+        :param updates: A list of tuples (item, new_rate).
+        Raises ItemNotFoundError if any item is not found in the queue.
+        Raises TypeError if any rate is not a number.
+        """
+        with self._lock:
+            # Validate all items first for atomicity
+            for item, rate in updates:
+                if not isinstance(rate, (int, float)):
+                    raise TypeError(f"Aging rate for item {item} must be a number")
+                if item not in self._items_set:
+                    raise ItemNotFoundError(f"item {item} not in priority queue")
+            
+            for item, rate in updates:
+                self._item_rates[item] = rate
+
     def remove_item_aging_rate(self, item: Any):
         """
         Removes the custom aging rate for a specific item, reverting it to the global rate.
@@ -84,6 +102,13 @@ class AgingPriorityQueue:
         """
         with self._lock:
             self._item_rates.clear()
+
+    def get_item_aging_rates(self) -> Dict[Any, float]:
+        """
+        Returns a dictionary of all current per-item aging rate overrides.
+        """
+        with self._lock:
+            return dict(self._item_rates)
 
     def _queue_items(self) -> List[Any]:
         """Internal helper to get all items in the queue."""
