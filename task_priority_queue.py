@@ -110,6 +110,14 @@ class AgingPriorityQueue:
         with self._lock:
             return dict(self._item_rates)
 
+    def get_item_aging_rates_many(self, items: List[Any]) -> Dict[Any, float]:
+        """
+        Returns the current aging rates for specific items. 
+        If an item has no custom rate, the global aging rate is returned.
+        """
+        with self._lock:
+            return {item: self._item_rates.get(item, self.aging_rate) for item in items if item in self._items_set}
+
     def _queue_items(self) -> List[Any]:
         """Internal helper to get all items in the queue."""
         return [entry[2] for entry in self._queue]
@@ -464,6 +472,12 @@ class AgingPriorityQueue:
                 if item in requested_set:
                     priorities[item] = self._calculate_effective_priority(base_p, entry_time, item, now)
             return priorities
+
+    def get_priorities_many(self, items: List[Any]) -> Dict[Any, float]:
+        """
+        Alias for get_priorities_for_items for consistency with other '_many' methods.
+        """
+        return self.get_priorities_for_items(items)
 
     def get_priority_details(self, item: Any) -> Dict[str, Any]:
         """
