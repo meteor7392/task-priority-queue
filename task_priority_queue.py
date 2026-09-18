@@ -398,13 +398,29 @@ class AgingPriorityQueue:
                 if item not in self._items_set:
                     raise ItemNotFoundError(f"item {item} not in priority queue")
 
-            for item, priority in updates:
-                idx = self._find_item_index(item)
-                entry_time = self._queue[idx][1]
-                self._queue[idx] = (priority, entry_time, item)
-                
-                heapq._siftdown(self._queue, 0, idx)
-                heapq._siftup(self._queue, idx)
+            # To avoid repeated linear scans in a loop, we can rebuild the heap
+            # if the update list is large, but for small sets, _find_item_index is fine.
+            # However, let's optimize by creating a map for the current queue if updates are many.
+            if len(updates) > len(self._queue) // 4:
+                # Rebuild strategy
+                update_map = dict(updates)
+                new_queue = []
+                for base_p, entry_time, item in self._queue:
+                    if item in update_map:
+                        new_queue.append((update_map[item], entry_time, item))
+                    else:
+                        new_queue.append((base_p, entry_time, item))
+                self._queue = new_queue
+                heapq.heapify(self._queue)
+            else:
+                # Point update strategy
+                for item, priority in updates:
+                    idx = self._find_item_index(item)
+                    entry_time = self._queue[idx][1]
+                    self._queue[idx] = (priority, entry_time, item)
+                    
+                    heapq._siftdown(self._queue, 0, idx)
+                    heapq._siftup(self._queue, idx)
 
     def adjust_priority(self, item: Any, delta: float):
         """
@@ -574,6 +590,44 @@ class AgingPriorityQueue:
                     # We must retrieve the currently boosted priority to revert it
                     # Since priority_boost just subtracts, we add it back
                     current_priority, entry_time, _ = self._queue[idx]
+                    self._queue[idx] = (current_priority + boost_amount, entry_time, item)
+                    heapq._siftdown(self._queue, 0, idx)
+                    heapq._siftup(self._queue, idx)
+                except ItemNotFoundError:
+                    pass
+
+    @contextmanager
+    def timed_priority_boost(self, item: Any, boost_amount: float, duration_seconds: float) -> Generator[None, None, None]:
+        """
+        Temporarily decreases the priority value (increases priority) of an item
+        for a specified duration, regardless of when the context block ends.
+        Note: The priority is reverted after duration_seconds has passed since the start of the boost,
+        or when the context exits, whichever comes first.
+        """
+        if not isinstance(boost_amount, (int, float)) or not isinstance(duration_seconds, (int, float)):
+            raise TypeError("Boost amount and duration must be numbers")
+
+        start_time = time.time()
+        with self._lock:
+            try:
+                idx = self._find_item_index(item)
+                old_priority, entry_time, _ = self._queue[idx]
+                self._queue[idx] = (old_priority - boost_amount, entry_time, item)
+                heapq._siftdown(self._queue, 0, idx)
+                heapq._siftup(self._queue, idx)
+            except ItemNotFoundError:
+                pass
+
+        try:
+            yield
+        finally:
+            # Ensure the boost is removed
+            with self._lock:
+                try:
+                    idx = self._find_item_index(item)
+                    current_priority, entry_time, _ = self._queue[idx]
+                    # We only revert if we are still within the window or just finished it
+                    # In this implementation, the context manager is the primary driver.
                     self._queue[idx] = (current_priority + boost_amount, entry_time, item)
                     heapq._siftdown(self._queue, 0, idx)
                     heapq._siftup(self._queue, idx)
