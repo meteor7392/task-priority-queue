@@ -99,7 +99,7 @@ class TestAgingPriorityQueue(unittest.TestCase):
         pq.push(3, "C")
         pq.push(4, "D")
         
-        pq.remove_many(["A", "C")
+        pq.remove_many(["A", "C"])
         self.assertNotIn("A", pq)
         self.assertNotIn("C", pq)
         self.assertIn("B", pq)
@@ -313,6 +313,46 @@ class TestAgingPriorityQueue(unittest.TestCase):
         self.assertEqual(pq.get_items_in_range(4, 6), ["Mid"])
         # Range [0, 6] should contain "High" and "Mid"
         self.assertCountEqual(pq.get_items_in_range(0, 6), ["High", "Mid"])
+
+    def test_top_and_bottom_details(self):
+        pq = AgingPriorityQueue(aging_rate=0)
+        pq.push(10, "Mid")
+        pq.push(1, "High")
+        pq.push(20, "Low")
+        
+        # Top item (High)
+        self.assertEqual(pq.peek(), "High")
+        self.assertEqual(pq.get_top_priority(), 1)
+        self.assertEqual(pq.get_top_item_aging_rate(), 0)
+        details_top = pq.get_top_item_details()
+        self.assertEqual(details_top["item"], "High")
+        self.assertEqual(details_top["effective_priority"], 1)
+        
+        # Bottom item (Low)
+        self.assertEqual(pq.peek_bottom(), "Low")
+        self.assertEqual(pq.get_bottom_priority(), 20)
+        details_bottom = pq.get_bottom_item_details()
+        self.assertEqual(details_bottom["item"], "Low")
+        self.assertEqual(details_bottom["effective_priority"], 20)
+
+    def test_bulk_aging_updates(self):
+        pq = AgingPriorityQueue(aging_rate=1)
+        pq.push(10, "A")
+        pq.push(10, "B")
+        pq.push(10, "C")
+        
+        updates = [("A", 5.0), ("B", 2.0)]
+        pq.update_item_aging_rates_many(updates)
+        
+        self.assertEqual(pq.get_item_aging_rates(), {"A": 5.0, "B": 2.0})
+        
+        # Test validation: ItemNotFoundError
+        with self.assertRaises(ItemNotFoundError):
+            pq.update_item_aging_rates_many([("D", 1.0)])
+            
+        # Test validation: TypeError
+        with self.assertRaises(TypeError):
+            pq.update_item_aging_rates_many([("A", "fast")])
 
 if __name__ == "__main__":
     unittest.main()
