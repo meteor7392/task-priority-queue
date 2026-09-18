@@ -219,6 +219,18 @@ class AgingPriorityQueue:
             idx, entry = self._find_best_entry(now)
             return self._calculate_effective_priority(entry[0], entry[1], entry[2], now)
 
+    def get_top_item_aging_rate(self) -> float:
+        """
+        Returns the current aging rate for the item that would be popped next.
+        """
+        with self._lock:
+            if not self._queue:
+                raise QueueEmptyError("get_top_item_aging_rate from an empty priority queue")
+            
+            _, entry = self._find_best_entry(time.time())
+            item = entry[2]
+            return self._item_rates.get(item, self.aging_rate)
+
     def get_top_item_details(self) -> Dict[str, Any]:
         """
         Returns the details (item, base_priority, entry_time) of the item that would be popped next.
