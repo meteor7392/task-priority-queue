@@ -1,6 +1,6 @@
 import heapq
 import time
-from threading import Lock
+from threading import Lock, Condition
 from typing import Any, Tuple, Iterator, Generator, List, Dict, Set, Optional
 from contextlib import contextmanager
 
@@ -29,6 +29,7 @@ class AgingPriorityQueue:
         """
         self._queue = []
         self._lock = Lock()
+        self._condition = Condition(self._lock)
         self.aging_rate = aging_rate
         self.min_priority = min_priority
         self._item_rates = {}
@@ -40,6 +41,7 @@ class AgingPriorityQueue:
         """
         with self._lock:
             self.aging_rate = new_rate
+            self._condition.notify_all()
 
     def set_min_priority(self, new_min: Optional[float]):
         """
@@ -56,6 +58,7 @@ class AgingPriorityQueue:
             if item not in self._items_set:
                 raise ItemNotFoundError("item not in priority queue")
             self._item_rates[item] = new_rate
+            self._condition.notify_all()
 
     def update_item_aging_rate(self, item: Any, new_rate: float):
         """
@@ -66,6 +69,7 @@ class AgingPriorityQueue:
             if item not in self._items_set:
                 raise ItemNotFoundError("item not in priority queue")
             self._item_rates[item] = new_rate
+            self._condition.notify_all()
 
     def update_item_aging_rates_many(self, updates: List[Tuple[Any, float]]):
         """
@@ -84,6 +88,7 @@ class AgingPriorityQueue:
             
             for item, rate in updates:
                 self._item_rates[item] = rate
+            self._condition.notify_all()
 
     def remove_item_aging_rate(self, item: Any):
         """
@@ -94,6 +99,7 @@ class AgingPriorityQueue:
                 raise ItemNotFoundError("item not in priority queue")
             if item in self._item_rates:
                 del self._item_rates[item]
+                self._condition.notify_all()
 
     def reset_all_item_aging_rates(self):
         """
@@ -102,6 +108,7 @@ class AgingPriorityQueue:
         """
         with self._lock:
             self._item_rates.clear()
+            self._condition.notify_all()
 
     def get_item_aging_rates(self) -> Dict[Any, float]:
         """
@@ -151,6 +158,7 @@ class AgingPriorityQueue:
             # The heap naturally orders by priority then entry_time (FIFO tie-break)
             heapq.heappush(self._queue, (priority, entry_time, item))
             self._items_set.add(item)
+            self._condition.notify_all()
 
     def push_many(self, items: List[Tuple[float, Any]]):
         """
@@ -165,6 +173,7 @@ class AgingPriorityQueue:
                 # for better FIFO stability, though they will be very close.
                 heapq.heappush(self._queue, (priority, time.time(), item))
                 self._items_set.add(item)
+            self._condition.notify_all()
 
     def _find_best_entry(self, now: float) -> Tuple[int, Tuple[float, float, Any]]:
         """Internal helper to find the item with the highest effective priority."""
@@ -322,6 +331,7 @@ class AgingPriorityQueue:
                 heapq._siftdown(self._queue, 0, best_idx)
                 heapq._siftup(self._queue, best_idx)
             
+            self._condition.notify_all()
             return item
 
     def pop_all(self) -> Generator[Any, None, None]:
@@ -349,6 +359,7 @@ class AgingPriorityQueue:
                 self._queue[idx] = last_element
                 heapq._siftdown(self._queue, 0, idx)
                 heapq._siftup(self._queue, idx)
+            self._condition.notify_all()
 
     def remove_many(self, items: List[Any]):
         """
@@ -377,6 +388,7 @@ class AgingPriorityQueue:
                 if item in self._item_rates:
                     del self._item_rates[item]
                 self._items_set.remove(item)
+            self._condition.notify_all()
 
     def update_priority(self, item: Any, new_priority: float):
         """
@@ -394,6 +406,7 @@ class AgingPriorityQueue:
             
             heapq._siftdown(self._queue, 0, idx)
             heapq._siftup(self._queue, idx)
+            self._condition.notify_all()
 
     def update_priorities_many(self, updates: List[Tuple[Any, float]]):
         """
@@ -433,6 +446,7 @@ class AgingPriorityQueue:
                     
                     heapq._siftdown(self._queue, 0, idx)
                     heapq._siftup(self._queue, idx)
+            self._condition.notify_all()
 
     def adjust_priority(self, item: Any, delta: float):
         """
@@ -451,6 +465,7 @@ class AgingPriorityQueue:
             
             heapq._siftdown(self._queue, 0, idx)
             heapq._siftup(self._queue, idx)
+            self._condition.notify_all()
 
     def get_current_priority(self, item: Any) -> float:
         """
@@ -557,6 +572,82 @@ class AgingPriorityQueue:
                     result.append(item)
             return result
 
+    def clear_priority_range(self, min_p: float, max_p: float):
+        """
+        Removes all items whose current effective priority falls within [min_p, max_p].
+        """
+        with self._lock:
+            now = time.time()
+            to_remove = []
+            for base_p, entry_time, item in self._queue:
+                effective = self._calculate_effective_priority(base_p, entry_time, item, now)
+                if min_p <= effective <= max_p:
+                    to_remove.append(item)
+            
+            if to_remove:
+                remove_set = set(to_remove)
+                self._queue = [entry for entry in self._queue if entry[2] not in remove_set]
+                heapq.heapify(self._queue)
+                for item in remove_set:
+                    if item in self._item_rates:
+                        del self._item_rates[item]
+                    self._items_set.remove(item)
+                self._condition.notify_all()
+
+    def wait_for_priority(self, item: Any, target_priority: float, timeout: Optional[float] = None) -> bool:
+        """
+        Blocks until the specified item reaches a priority value <= target_priority
+        (meaning it becomes more prioritized).
+        Returns True if the item reached the priority, False if it timed out or was removed.
+        """
+        start_time = time.time()
+        with self._condition:
+            while True:
+                try:
+                    current_p = self.get_current_priority(item)
+                    if current_p <= target_priority:
+                        return True
+                except ItemNotFoundError:
+                    return False
+
+                elapsed = time.time() - start_time
+                remaining = (timeout - elapsed) if timeout is not None else None
+                
+                if timeout is not None and remaining <= 0:
+                    return False
+
+                # Calculate approximate wait time based on aging rate to avoid busy looping
+                # effective_p = base_p - (now - entry_time) * rate
+                # we want effective_p <= target_p
+                # (now - entry_time) * rate >= base_p - target_p
+                # now >= entry_time + (base_p - target_p) / rate
+                
+                # We need the item's internal data for this
+                try:
+                    details = self.get_priority_details(item)
+                    base_p = details["base_priority"]
+                    entry_time = details["entry_time"]
+                    rate = self._item_rates.get(item, self.aging_rate)
+                    
+                    if rate > 0:
+                        wait_time = (base_p - target_priority) / rate - (time.time() - entry_time)
+                        # Wait for a bit, but not longer than the estimated time or the timeout
+                        sleep_duration = max(0.1, min(wait_time, 1.0))
+                        if timeout is not None:
+                            sleep_duration = min(sleep_duration, remaining)
+                    else:
+                        # If not aging, we can only wake up on external changes (rate change, etc.)
+                        sleep_duration = 1.0
+                        if timeout is not None:
+                            sleep_duration = min(sleep_duration, remaining)
+                except ItemNotFoundError:
+                    return False
+
+                if not self._condition.wait(timeout=sleep_duration):
+                    # wait() returns True if notified, False if timed out
+                    if timeout is not None and (time.time() - start_time) >= timeout:
+                        return False
+
     def get_all_items(self) -> Set[Any]:
         """
         Returns a set of all items currently in the queue.
@@ -572,6 +663,7 @@ class AgingPriorityQueue:
             self._queue.clear()
             self._item_rates.clear()
             self._items_set.clear()
+            self._condition.notify_all()
 
     @contextmanager
     def priority_boost(self, item: Any, boost_amount: float) -> Generator[None, None, None]:
@@ -589,6 +681,7 @@ class AgingPriorityQueue:
                 self._queue[idx] = (old_priority - boost_amount, entry_time, item)
                 heapq._siftdown(self._queue, 0, idx)
                 heapq._siftup(self._queue, idx)
+                self._condition.notify_all()
             except ItemNotFoundError:
                 # If item is not in queue, the boost cannot be applied, but we let the context continue
                 pass
@@ -605,6 +698,7 @@ class AgingPriorityQueue:
                     self._queue[idx] = (current_priority + boost_amount, entry_time, item)
                     heapq._siftdown(self._queue, 0, idx)
                     heapq._siftup(self._queue, idx)
+                    self._condition.notify_all()
                 except ItemNotFoundError:
                     pass
 
@@ -627,6 +721,7 @@ class AgingPriorityQueue:
                 self._queue[idx] = (old_priority - boost_amount, entry_time, item)
                 heapq._siftdown(self._queue, 0, idx)
                 heapq._siftup(self._queue, idx)
+                self._condition.notify_all()
             except ItemNotFoundError:
                 pass
 
@@ -643,6 +738,7 @@ class AgingPriorityQueue:
                     self._queue[idx] = (current_priority + boost_amount, entry_time, item)
                     heapq._siftdown(self._queue, 0, idx)
                     heapq._siftup(self._queue, idx)
+                    self._condition.notify_all()
                 except ItemNotFoundError:
                     pass
 
